@@ -36,4 +36,24 @@ export default async function progressRoutes(app: FastifyInstance) {
       return progress;
     }
   );
+
+  app.delete<{ Params: { id: string } }>(
+    "/api/books/:id/progress",
+    { preHandler: requireAuth },
+    async (request) => {
+      await prisma.readingProgress
+        .delete({ where: { userId_bookId: { userId: request.user!.id, bookId: request.params.id } } })
+        .catch(() => {});
+      return { location: null, percent: 0 };
+    }
+  );
+
+  app.get("/api/continue-reading", { preHandler: requireAuth }, async (request) => {
+    const rows = await prisma.readingProgress.findMany({
+      where: { userId: request.user!.id, percent: { gt: 0, lt: 100 } },
+      orderBy: { updatedAt: "desc" },
+      include: { book: { include: { series: { select: { id: true, title: true } } } } },
+    });
+    return rows.map((row) => ({ ...row.book, progressPercent: row.percent }));
+  });
 }

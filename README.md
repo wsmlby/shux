@@ -9,8 +9,9 @@ per-user reading progress.
 
 - **Automated ingestion** — scans a mounted library directory for `.pdf`,
   `.epub`, and `.txt` files.
-- **Metadata fetching** — reads embedded EPUB/PDF metadata and enriches it
-  (cover, description, publish year) from the Open Library API.
+- **Metadata fetching** — reads embedded EPUB/PDF metadata, rasterizes a PDF's
+  first page as its cover (via `pdftoppm`), and enriches all of it (cover,
+  description, publish year) from the Open Library API.
 - **Multi-user accounts** — admin/user roles, each with their own reading
   progress per book.
 - **Responsive web reader** — EPUB reflow via epub.js, PDF rendering via
@@ -40,7 +41,10 @@ directory up along with `./library`.
 
 ## Local development
 
-Requires Node.js 20+.
+Requires Node.js 20+. PDF cover extraction shells out to `pdftoppm` (from
+poppler-utils); install it locally (`apt install poppler-utils` /
+`brew install poppler`) if you want covers outside Docker — scanning still
+works without it, PDFs just won't get a generated cover.
 
 ```bash
 npm install
@@ -69,5 +73,3 @@ DATABASE_URL="file:../data/shux.db" npx prisma migrate deploy
 - azw/azw3/mobi support via Calibre's `ebook-convert` (converted to EPUB on
   ingest).
 - Background/scheduled library scanning (currently manual, admin-triggered).
-- Cover thumbnails generated from the first page of PDFs without embedded
-  metadata.

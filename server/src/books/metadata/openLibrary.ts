@@ -1,4 +1,6 @@
 export interface OpenLibraryResult {
+  title?: string;
+  author?: string;
   description?: string;
   coverUrl?: string;
   publishedAt?: string;
@@ -55,6 +57,8 @@ export async function fetchOpenLibraryMetadata(
     }
 
     return {
+      title: doc.title,
+      author: doc.author_name?.join(", "),
       description,
       coverUrl: doc.cover_i ? `https://covers.openlibrary.org/b/id/${doc.cover_i}-L.jpg` : undefined,
       publishedAt: doc.first_publish_year ? String(doc.first_publish_year) : undefined,

@@ -117,6 +117,12 @@ button.danger {
   background: var(--danger);
 }
 
+button.secondary {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
 input,
 select {
   background: var(--surface);
@@ -194,6 +200,7 @@ select {
 }
 
 .book-cover {
+  position: relative;
   aspect-ratio: 2 / 3;
   border-radius: 8px;
   overflow: hidden;
@@ -220,6 +227,38 @@ select {
 
 .book-cover-placeholder.large {
   font-size: 1.5rem;
+}
+
+.series-cover-stack {
+  position: relative;
+  box-shadow:
+    3px 3px 0 -1px var(--bg),
+    3px 3px 0 0 var(--border),
+    6px 6px 0 -1px var(--bg),
+    6px 6px 0 0 var(--border);
+}
+
+.series-badge {
+  position: absolute;
+  top: 0.4rem;
+  right: 0.4rem;
+  background: var(--accent);
+  color: var(--accent-contrast);
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  line-height: 1.4;
+}
+
+.series-link {
+  color: var(--muted);
+  margin: 0.1rem 0 0.5rem;
+}
+
+.series-link a {
+  color: var(--accent);
+  font-weight: 600;
 }
 
 .book-title {
@@ -310,7 +349,13 @@ select {
   flex-direction: column;
 }
 
-.epub-reader,
+.epub-reader {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
 .epub-viewer {
   flex: 1;
   min-height: 0;
@@ -326,20 +371,77 @@ select {
   gap: 1rem;
 }
 
-.pdf-controls {
+.pdf-controls,
+.epub-controls {
   position: sticky;
   bottom: 0;
   display: flex;
-  gap: 1rem;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
   align-items: center;
+  justify-content: center;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 999px;
   padding: 0.5rem 1rem;
+  flex-shrink: 0;
+  align-self: center;
+  margin-top: 0.75rem;
+}
+
+.epub-controls {
+  border-radius: 999px;
+}
+
+.pdf-controls {
+  border-radius: 14px;
+}
+
+.pdf-control-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding-inline: 0.5rem;
+}
+
+.pdf-control-group:not(:last-child) {
+  border-right: 1px solid var(--border);
+}
+
+.pdf-zoom-label {
+  min-width: 3.2em;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.icon-button {
+  width: 1.9rem;
+  height: 1.9rem;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  line-height: 1;
+  border-radius: 50%;
+}
+
+.pdf-pages {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+}
+
+.txt-reader-shell {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .txt-reader {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding: 1.5rem;
   display: flex;
@@ -372,4 +474,187 @@ select {
   gap: 0.6rem;
   flex-wrap: wrap;
   align-items: center;
+}
+
+/* Edit pages (book / series) */
+
+.edit-page h1 {
+  margin-top: 0.5rem;
+}
+
+.edit-page h2 {
+  margin-top: 2rem;
+  font-size: 1.1rem;
+}
+
+.edit-layout {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 2rem;
+}
+
+@media (max-width: 640px) {
+  .edit-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.edit-cover-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.edit-cover-panel button {
+  width: 100%;
+}
+
+.edit-cover {
+  max-width: 220px;
+}
+
+.lookup-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+}
+
+.edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  max-width: 60ch;
+}
+
+.edit-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.9rem;
+}
+
+.edit-form input,
+.edit-form textarea {
+  font-family: inherit;
+}
+
+.edit-form-row {
+  display: flex;
+  gap: 0.9rem;
+}
+
+.edit-form-row label {
+  flex: 1;
+}
+
+.danger-zone {
+  border: 1px solid var(--danger);
+  border-radius: 10px;
+  padding: 1rem 1.25rem;
+  max-width: 60ch;
+}
+
+.danger-zone h2 {
+  margin-top: 0;
+}
+
+.edit-volume-list {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.edit-volume-list a {
+  color: var(--accent);
+}
+
+.series-detail-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+/* Next-in-series suggestion */
+
+.next-in-series {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1rem;
+  margin-top: 1rem;
+  max-width: 480px;
+}
+
+.next-in-series-cover {
+  width: 64px;
+  aspect-ratio: 2 / 3;
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.next-in-series-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.next-in-series-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.next-in-series-title {
+  font-weight: 700;
+}
+
+.reader-body > .next-in-series {
+  align-self: center;
+  margin: 0.75rem auto 0;
+}
+
+/* Continue Reading deck */
+
+.deck-section {
+  margin-bottom: 2rem;
+}
+
+.deck-row {
+  display: flex;
+  gap: 1.25rem;
+  overflow-x: auto;
+  padding-bottom: 0.5rem;
+}
+
+.deck-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  width: 150px;
+  flex-shrink: 0;
+}
+
+.deck-progress-track {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 5px;
+  background: color-mix(in srgb, black 40%, transparent);
+}
+
+.deck-progress-fill {
+  height: 100%;
+  background: var(--accent);
 }

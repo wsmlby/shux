@@ -17,7 +17,8 @@ COPY server server
 RUN npm run build -w server
 
 FROM node:20-alpine AS runtime
-RUN apk add --no-cache openssl
+# poppler-utils provides pdftoppm, used to rasterize PDF cover thumbnails.
+RUN apk add --no-cache openssl poppler-utils
 WORKDIR /app
 ENV NODE_ENV=production \
     PORT=8080 \

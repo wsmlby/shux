@@ -28,20 +28,40 @@ model Session {
   createdAt DateTime @default(now())
 }
 
+// A detected multi-volume work (e.g. a folder of numbered books, or files
+// sharing a common "Title 01", "Title 02" filename prefix) — the book
+// equivalent of a TV show grouping its episodes.
+model Series {
+  id        String   @id @default(cuid())
+  title     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  books     Book[]
+}
+
 model Book {
-  id          String            @id @default(cuid())
-  path        String            @unique
-  format      String
-  title       String
-  author      String?
-  description String?
-  isbn        String?
-  publishedAt String?
-  hasCover    Boolean           @default(false)
-  fileSize    Int
-  addedAt     DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
-  progress    ReadingProgress[]
+  id           String            @id @default(cuid())
+  path         String            @unique
+  format       String
+  title        String
+  author       String?
+  description  String?
+  isbn         String?
+  publishedAt  String?
+  hasCover     Boolean           @default(false)
+  fileSize     Int
+  addedAt      DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  progress     ReadingProgress[]
+  seriesId     String?
+  series       Series?           @relation(fields: [seriesId], references: [id])
+  volumeNumber Float?
+  volumeLabel  String?
+  // Set when a series was manually ungrouped, so automatic series detection
+  // on a later scan doesn't silently put it right back together.
+  seriesOverride Boolean         @default(false)
+
+  @@index([seriesId])
 }
 
 model ReadingProgress {

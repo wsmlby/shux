@@ -8,6 +8,7 @@ import authPlugin from "./auth/plugin.js";
 import authRoutes from "./auth/routes.js";
 import userRoutes from "./users/routes.js";
 import bookRoutes from "./books/routes.js";
+import seriesRoutes from "./series/routes.js";
 import progressRoutes from "./progress/routes.js";
 import "./types.js";
 
@@ -21,10 +22,15 @@ export async function buildApp() {
   await app.register(authRoutes);
   await app.register(userRoutes);
   await app.register(bookRoutes);
+  await app.register(seriesRoutes);
   await app.register(progressRoutes);
 
+  // wildcard defaults to true, so real files under web-dist (JS/CSS/icon)
+  // are served with correct content types; when it finds no matching file,
+  // @fastify/static calls reply.callNotFound(), which falls through to the
+  // SPA handler below to serve index.html for client-side routes.
   const webDist = path.join(process.cwd(), "web-dist");
-  await app.register(staticFiles, { root: webDist, wildcard: false });
+  await app.register(staticFiles, { root: webDist });
   app.setNotFoundHandler((request, reply) => {
     if (request.raw.url?.startsWith("/api/")) {
       return reply.code(404).send({ error: "Not found" });

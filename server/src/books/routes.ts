@@ -4,7 +4,9 @@ import path from "node:path";
 import type { FastifyInstance } from "fastify";
 import { prisma } from "../db.js";
 import { requireAuth, requireAdmin } from "../auth/guards.js";
-import { scanLibrary } from "./scanner.js";
+import { scanLibrary, resetAllMetadata, saveCover } from "./scanner.js";
+import { fetchOpenLibraryMetadata } from "./metadata/openLibrary.js";
+import { extractPdfCover, PopplerNotInstalledError } from "./parsers/pdf.js";
 import { coversDir } from "../config.js";
 
 const MIME: Record<string, string> = {
@@ -28,6 +30,7 @@ export default async function bookRoutes(app: FastifyInstance) {
             }
           : {}),
       },
+      include: { series: { select: { id: true, title: true } } },
       orderBy: { title: "asc" },
     });
     return books;
@@ -37,7 +40,10 @@ export default async function bookRoutes(app: FastifyInstance) {
     "/api/books/:id",
     { preHandler: requireAuth },
     async (request, reply) => {
-      const book = await prisma.book.findUnique({ where: { id: request.params.id } });
+      const book = await prisma.book.findUnique({
+        where: { id: request.params.id },
+        include: { series: { select: { id: true, title: true } } },
+      });
       if (!book) return reply.code(404).send({ error: "Not found" });
       return book;
     }
@@ -101,7 +107,151 @@ export default async function bookRoutes(app: FastifyInstance) {
     }
   );
 
-  app.post("/api/scan", { preHandler: requireAdmin }, async () => {
-    return scanLibrary();
+  interface BookUpdateBody {
+    title?: string;
+    author?: string | null;
+    description?: string | null;
+    isbn?: string | null;
+    publishedAt?: string | null;
+    volumeLabel?: string | null;
+    coverUrl?: string;
+  }
+
+  const EDITABLE_STRING_FIELDS = ["author", "description", "isbn", "publishedAt", "volumeLabel"] as const;
+
+  app.patch<{ Params: { id: string }; Body: BookUpdateBody }>(
+    "/api/books/:id",
+    { preHandler: requireAdmin },
+    async (request, reply) => {
+      const book = await prisma.book.findUnique({ where: { id: request.params.id } });
+      if (!book) return reply.code(404).send({ error: "Not found" });
+
+      const body = request.body ?? {};
+      const data: Record<string, unknown> = {};
+
+      if (body.title !== undefined) {
+        if (typeof body.title !== "string" || !body.title.trim()) {
+          return reply.code(400).send({ error: "title must be a non-empty string" });
+        }
+        data.title = body.title.trim();
+      }
+
+      for (const field of EDITABLE_STRING_FIELDS) {
+        const value = body[field];
+        if (value === undefined) continue;
+        if (value !== null && typeof value !== "string") {
+          return reply.code(400).send({ error: `${field} must be a string or null` });
+        }
+        data[field] = value === null ? null : value.trim() || null;
+      }
+
+      if (body.coverUrl) {
+        try {
+          const response = await fetch(body.coverUrl);
+          if (!response.ok) throw new Error(`fetch failed (${response.status})`);
+          const buffer = Buffer.from(await response.arrayBuffer());
+          await saveCover(book.id, buffer);
+          data.hasCover = true;
+        } catch (err) {
+          request.log.error({ err, coverUrl: body.coverUrl }, "failed to download cover for manual edit");
+          return reply.code(502).send({ error: "Failed to download the cover image from that URL" });
+        }
+      }
+
+      const updated = await prisma.book.update({
+        where: { id: book.id },
+        data,
+        include: { series: { select: { id: true, title: true } } },
+      });
+      return updated;
+    }
+  );
+
+  app.post<{ Params: { id: string }; Body: { title?: string; author?: string } | undefined }>(
+    "/api/books/:id/lookup-metadata",
+    { preHandler: requireAdmin },
+    async (request, reply) => {
+      const book = await prisma.book.findUnique({ where: { id: request.params.id } });
+      if (!book) return reply.code(404).send({ error: "Not found" });
+
+      const title = request.body?.title?.trim() || book.title;
+      const author = request.body?.author?.trim() || book.author || undefined;
+
+      request.log.info({ bookId: book.id, title, author }, "manual Open Library lookup requested");
+      const result = await fetchOpenLibraryMetadata(title, author);
+      if (!result) return reply.code(404).send({ error: "No match found on Open Library for that title/author" });
+      return result;
+    }
+  );
+
+  app.post<{ Params: { id: string } }>(
+    "/api/books/:id/regenerate-cover",
+    { preHandler: requireAdmin },
+    async (request, reply) => {
+      const book = await prisma.book.findUnique({ where: { id: request.params.id } });
+      if (!book) return reply.code(404).send({ error: "Not found" });
+      if (book.format !== "PDF") {
+        return reply.code(400).send({ error: "Cover regeneration only applies to PDF books" });
+      }
+
+      request.log.info({ bookId: book.id, path: book.path }, "regenerating PDF cover");
+      let cover: Buffer;
+      try {
+        cover = await extractPdfCover(book.path);
+      } catch (err) {
+        request.log.error({ err, bookId: book.id }, "PDF cover regeneration failed");
+        if (err instanceof PopplerNotInstalledError) {
+          return reply.code(502).send({
+            error:
+              "poppler-utils (pdftoppm) is not installed in this container. Rebuild and redeploy the Docker " +
+              "image (docker compose up -d --build), then try again.",
+          });
+        }
+        return reply.code(502).send({
+          error: "Could not extract a cover from this PDF's first page — the file may be corrupted or unreadable.",
+        });
+      }
+
+      await saveCover(book.id, cover);
+      const updated = await prisma.book.update({
+        where: { id: book.id },
+        data: { hasCover: true },
+        include: { series: { select: { id: true, title: true } } },
+      });
+      return updated;
+    }
+  );
+
+  app.post<{ Body: { full?: boolean } | undefined }>(
+    "/api/scan",
+    { preHandler: requireAdmin },
+    async (request, reply) => {
+      const full = request.body?.full === true;
+      request.log.info({ user: request.user!.email, full }, "library scan requested");
+      try {
+        const result = await scanLibrary(request.log, { full });
+        request.log.info(result, "library scan finished");
+        return result;
+      } catch (err) {
+        request.log.error({ err }, "library scan failed");
+        return reply.code(500).send({
+          error: err instanceof Error ? err.message : "Scan failed, see server logs",
+        });
+      }
+    }
+  );
+
+  app.post("/api/books/reset-metadata", { preHandler: requireAdmin }, async (request, reply) => {
+    request.log.info({ user: request.user!.email }, "metadata reset requested");
+    try {
+      const result = await resetAllMetadata(request.log);
+      request.log.info(result, "metadata reset finished");
+      return result;
+    } catch (err) {
+      request.log.error({ err }, "metadata reset failed");
+      return reply.code(500).send({
+        error: err instanceof Error ? err.message : "Reset failed, see server logs",
+      });
+    }
   });
 }
