@@ -1,0 +1,58 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// SQLite has no native enum support in Prisma; roles/formats are plain
+// strings constrained by the application (see server/src/types.ts).
+model User {
+  id           String            @id @default(cuid())
+  email        String            @unique
+  name         String
+  passwordHash String
+  role         String            @default("USER")
+  createdAt    DateTime          @default(now())
+  sessions     Session[]
+  progress     ReadingProgress[]
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+model Book {
+  id          String            @id @default(cuid())
+  path        String            @unique
+  format      String
+  title       String
+  author      String?
+  description String?
+  isbn        String?
+  publishedAt String?
+  hasCover    Boolean           @default(false)
+  fileSize    Int
+  addedAt     DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  progress    ReadingProgress[]
+}
+
+model ReadingProgress {
+  id        String   @id @default(cuid())
+  userId    String
+  bookId    String
+  location  String
+  percent   Float    @default(0)
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  book      Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, bookId])
+}

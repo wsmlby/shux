@@ -1,0 +1,14 @@
+services:
+  shux:
+    build: .
+    image: shux:latest
+    container_name: shux
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      COOKIE_SECRET: ${COOKIE_SECRET:-change-me-to-a-long-random-string}
+      SESSION_TTL_DAYS: "30"
+    volumes:
+      - ./library:/library
+      - ./data:/data
