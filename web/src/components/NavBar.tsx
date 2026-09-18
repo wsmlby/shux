@@ -13,6 +13,7 @@ export default function NavBar() {
   return (
     <header className="navbar">
       <Link to="/" className="brand">
+        <img src="/icon.svg" alt="" className="brand-icon" />
         Shux
       </Link>
       <nav>

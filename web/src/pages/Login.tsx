@@ -29,6 +29,7 @@ export default function Login() {
   return (
     <div className="auth-screen">
       <form className="auth-card" onSubmit={handleSubmit}>
+        <img src="/icon.svg" alt="" className="auth-icon" />
         <h1>Shux</h1>
         <p className="muted">Sign in to your library.</p>
         {error && <div className="error">{error}</div>}

@@ -65,9 +65,18 @@ a {
 }
 
 .navbar .brand {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   font-weight: 700;
   font-size: 1.25rem;
   letter-spacing: 0.02em;
+}
+
+.brand-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
 }
 
 .navbar nav {
@@ -136,6 +145,13 @@ select {
   display: flex;
   flex-direction: column;
   gap: 0.85rem;
+}
+
+.auth-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  align-self: center;
 }
 
 .auth-card label {

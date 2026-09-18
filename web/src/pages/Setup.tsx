@@ -26,6 +26,7 @@ export default function Setup() {
   return (
     <div className="auth-screen">
       <form className="auth-card" onSubmit={handleSubmit}>
+        <img src="/icon.svg" alt="" className="auth-icon" />
         <h1>Welcome to Shux</h1>
         <p className="muted">Create the first admin account to get started.</p>
         {error && <div className="error">{error}</div>}
