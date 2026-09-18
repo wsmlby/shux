@@ -9,6 +9,7 @@ import SeriesDetail from "./pages/SeriesDetail.js";
 import SeriesEdit from "./pages/SeriesEdit.js";
 import Reader from "./pages/Reader.js";
 import Users from "./pages/Users.js";
+import Account from "./pages/Account.js";
 import NavBar from "./components/NavBar.js";
 
 function ConditionalNavBar() {
@@ -47,6 +48,7 @@ export default function App() {
               <Route path="/series/:id/edit" element={<SeriesEdit />} />
               <Route path="/reader/:id" element={<Reader />} />
               <Route path="/users" element={<Users />} />
+              <Route path="/account" element={<Account />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </ProtectedRoute>

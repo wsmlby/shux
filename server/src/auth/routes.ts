@@ -91,4 +91,26 @@ export default async function authRoutes(app: FastifyInstance) {
   app.get("/api/auth/me", { preHandler: requireAuth }, async (request) => {
     return request.user;
   });
+
+  app.patch<{ Body: { currentPassword?: string; newPassword?: string } }>(
+    "/api/auth/password",
+    { preHandler: requireAuth },
+    async (request, reply) => {
+      const { currentPassword, newPassword } = request.body ?? {};
+      if (!currentPassword || !newPassword || newPassword.length < 8) {
+        return reply
+          .code(400)
+          .send({ error: "currentPassword and a newPassword of 8+ characters are required" });
+      }
+
+      const user = await prisma.user.findUnique({ where: { id: request.user!.id } });
+      if (!user || !(await verifyPassword(currentPassword, user.passwordHash))) {
+        return reply.code(401).send({ error: "Current password is incorrect" });
+      }
+
+      const passwordHash = await hashPassword(newPassword);
+      await prisma.user.update({ where: { id: user.id }, data: { passwordHash } });
+      return { ok: true };
+    }
+  );
 }

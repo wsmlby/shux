@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Navigate } from "react-router-dom";
 import { api, ApiError } from "../api/client.js";
@@ -12,6 +12,11 @@ export default function Users() {
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<"ADMIN" | "USER">("USER");
   const [error, setError] = useState<string | null>(null);
+
+  const [resetTargetId, setResetTargetId] = useState<string | null>(null);
+  const [resetPassword, setResetPassword] = useState("");
+  const [resetError, setResetError] = useState<string | null>(null);
+  const [resetSuccessId, setResetSuccessId] = useState<string | null>(null);
 
   const { data: users } = useQuery({ queryKey: ["users"], queryFn: api.users });
 
@@ -38,6 +43,27 @@ export default function Users() {
     queryClient.invalidateQueries({ queryKey: ["users"] });
   }
 
+  function startReset(id: string) {
+    setResetTargetId(id);
+    setResetPassword("");
+    setResetError(null);
+    setResetSuccessId(null);
+  }
+
+  async function handleResetSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!resetTargetId) return;
+    setResetError(null);
+    try {
+      await api.resetUserPassword(resetTargetId, resetPassword);
+      setResetSuccessId(resetTargetId);
+      setResetTargetId(null);
+      setResetPassword("");
+    } catch (err) {
+      setResetError(err instanceof ApiError ? err.message : "Failed to reset password");
+    }
+  }
+
   return (
     <main className="container">
       <h1>Users</h1>
@@ -52,18 +78,52 @@ export default function Users() {
         </thead>
         <tbody>
           {users?.map((u) => (
-            <tr key={u.id}>
-              <td>{u.name}</td>
-              <td>{u.email}</td>
-              <td>{u.role}</td>
-              <td>
-                {u.id !== user.id && (
-                  <button className="link-button danger" onClick={() => handleDelete(u.id)}>
-                    Remove
+            <Fragment key={u.id}>
+              <tr>
+                <td>{u.name}</td>
+                <td>{u.email}</td>
+                <td>{u.role}</td>
+                <td>
+                  <button className="link-button" onClick={() => startReset(u.id)}>
+                    Reset password
                   </button>
-                )}
-              </td>
-            </tr>
+                  {u.id !== user.id && (
+                    <button className="link-button danger" onClick={() => handleDelete(u.id)}>
+                      Remove
+                    </button>
+                  )}
+                </td>
+              </tr>
+              {resetTargetId === u.id && (
+                <tr key={`${u.id}-reset`}>
+                  <td colSpan={4}>
+                    <form className="inline-form" onSubmit={handleResetSubmit}>
+                      {resetError && <span className="error">{resetError}</span>}
+                      <input
+                        type="password"
+                        placeholder={`New password for ${u.name}`}
+                        value={resetPassword}
+                        onChange={(e) => setResetPassword(e.target.value)}
+                        minLength={8}
+                        autoFocus
+                        required
+                      />
+                      <button type="submit">Save</button>
+                      <button type="button" className="secondary" onClick={() => setResetTargetId(null)}>
+                        Cancel
+                      </button>
+                    </form>
+                  </td>
+                </tr>
+              )}
+              {resetSuccessId === u.id && (
+                <tr key={`${u.id}-reset-ok`}>
+                  <td colSpan={4} className="muted">
+                    Password changed.
+                  </td>
+                </tr>
+              )}
+            </Fragment>
           ))}
         </tbody>
       </table>

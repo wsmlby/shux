@@ -95,6 +95,7 @@ a {
 }
 
 .link-button.danger {
+  background: none;
   color: var(--danger);
 }
 
@@ -467,6 +468,10 @@ select {
   text-align: left;
   padding: 0.5rem 0.75rem;
   border-bottom: 1px solid var(--border);
+}
+
+.user-table .link-button + .link-button {
+  margin-left: 1rem;
 }
 
 .inline-form {

@@ -18,7 +18,7 @@ export default function NavBar() {
       </Link>
       <nav>
         {user?.role === "ADMIN" && <Link to="/users">Users</Link>}
-        <span className="muted">{user?.name}</span>
+        <Link to="/account">{user?.name}</Link>
         <button className="link-button" onClick={handleLogout}>
           Sign out
         </button>

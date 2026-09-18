@@ -112,9 +112,13 @@ export const api = {
     request<User>("/auth/login", { method: "POST", body: JSON.stringify(data) }),
   logout: () => request<{ ok: true }>("/auth/logout", { method: "POST" }),
   me: () => request<User>("/auth/me"),
+  changePassword: (data: { currentPassword: string; newPassword: string }) =>
+    request<{ ok: true }>("/auth/password", { method: "PATCH", body: JSON.stringify(data) }),
 
   users: () => request<User[]>("/users"),
   deleteUser: (id: string) => request<{ ok: true }>(`/users/${id}`, { method: "DELETE" }),
+  resetUserPassword: (id: string, newPassword: string) =>
+    request<{ ok: true }>(`/users/${id}/password`, { method: "PATCH", body: JSON.stringify({ newPassword }) }),
 
   books: (params?: { q?: string; format?: string }) => {
     const searchParams = new URLSearchParams();
