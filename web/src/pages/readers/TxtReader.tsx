@@ -9,17 +9,23 @@ interface Props {
   fullscreen: boolean;
 }
 
-// Plain text has no natural page breaks, so we treat fixed-size byte ranges
-// as "pages" and fetch only the current one via an HTTP Range request —
-// large TXT files never get loaded into the browser all at once.
-const CHUNK_SIZE = 4000;
-
+// Plain text has no natural page breaks, so we treat fixed-size chunks of
+// the *decoded* text as "pages". Pagination happens server-side (see
+// server/src/books/textChunks.ts) — the server decodes the whole file with
+// the book's configured encoding and slices the resulting string, so a page
+// boundary is always a real character boundary regardless of encoding.
+// Chunking raw file bytes client-side (the original approach) only ever
+// worked for UTF-8's self-synchronizing byte structure; encodings like
+// GBK/Big5/Shift_JIS would decode whole pages as garbage whenever a byte
+// range happened to start mid-character.
 export default function TxtReader({ book, initialLocation, fullscreen }: Props) {
-  const totalChunks = Math.max(1, Math.ceil(book.fileSize / CHUNK_SIZE));
   const [chunkIndex, setChunkIndex] = useState(() => {
     const parsed = initialLocation ? parseInt(initialLocation, 10) : 0;
-    return Number.isFinite(parsed) && parsed >= 0 && parsed < totalChunks ? parsed : 0;
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
   });
+  // A placeholder until the first chunk response reports the real count —
+  // the server is the only side that knows the decoded character length.
+  const [totalChunks, setTotalChunks] = useState(1);
   const [text, setText] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [goToInput, setGoToInput] = useState("");
@@ -30,24 +36,17 @@ export default function TxtReader({ book, initialLocation, fullscreen }: Props) 
     setText(null);
     setError(null);
 
-    const start = chunkIndex * CHUNK_SIZE;
-    const end = Math.min(start + CHUNK_SIZE, book.fileSize) - 1;
-
-    fetch(api.fileUrl(book.id), {
-      credentials: "include",
-      headers: { Range: `bytes=${start}-${end}` },
-    })
-      .then((res) => {
-        if (!res.ok) throw new Error(`Request failed (${res.status})`);
-        return res.arrayBuffer();
-      })
-      .then((buf) => {
+    api
+      .textChunk(book.id, chunkIndex)
+      .then((chunk) => {
         if (cancelled) return;
-        // Decoded independently per chunk: a multi-byte UTF-8 character that
-        // straddles a chunk boundary can render as a stray replacement
-        // character right at the seam — a rare, cosmetic tradeoff for not
-        // having to keep decoder/byte state across arbitrary page jumps.
-        setText(new TextDecoder("utf-8").decode(buf));
+        setText(chunk.text);
+        setTotalChunks(chunk.totalChunks);
+        // The server clamps an out-of-range index (e.g. a location saved
+        // before the file changed or before the encoding was fixed) —
+        // resync so Prev/Next bounds and the page number reflect where we
+        // actually landed.
+        if (chunk.chunkIndex !== chunkIndex) setChunkIndex(chunk.chunkIndex);
         containerRef.current?.scrollTo({ top: 0 });
       })
       .catch((err) => {
@@ -59,10 +58,13 @@ export default function TxtReader({ book, initialLocation, fullscreen }: Props) 
     return () => {
       cancelled = true;
     };
-  }, [book.id, book.fileSize, chunkIndex]);
+  }, [book.id, book.encoding, chunkIndex]);
 
   useEffect(() => {
-    const percent = Math.round((chunkIndex / Math.max(totalChunks - 1, 1)) * 100);
+    // Unrounded: a long file can have many chunks, so early progress can
+    // round to 0% and vanish from the continue-reading deck (it only lists
+    // percent > 0) despite the user really being partway through.
+    const percent = (chunkIndex / Math.max(totalChunks - 1, 1)) * 100;
     const timer = setTimeout(() => {
       api.saveProgress(book.id, { location: String(chunkIndex), percent }).catch(() => {});
     }, 500);
@@ -152,15 +154,17 @@ export default function TxtReader({ book, initialLocation, fullscreen }: Props) 
             </>
           )}
         </GoToMenu>
-        <button onClick={() => goTo(-1)} disabled={chunkIndex <= 0}>
-          ← Prev
-        </button>
-        <span>
-          Page {chunkIndex + 1} of {totalChunks}
-        </span>
-        <button onClick={() => goTo(1)} disabled={chunkIndex >= totalChunks - 1}>
-          Next →
-        </button>
+        <div className="controls-scroll">
+          <button onClick={() => goTo(-1)} disabled={chunkIndex <= 0}>
+            ← Prev
+          </button>
+          <span>
+            Page {chunkIndex + 1} of {totalChunks}
+          </span>
+          <button onClick={() => goTo(1)} disabled={chunkIndex >= totalChunks - 1}>
+            Next →
+          </button>
+        </div>
       </div>
       {chunkIndex >= totalChunks - 1 && book.seriesId && <NextInSeriesCard book={book} />}
     </div>

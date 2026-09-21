@@ -55,6 +55,10 @@ a {
   color: var(--muted);
 }
 
+.field-hint {
+  font-size: 0.8rem;
+}
+
 .navbar {
   display: flex;
   align-items: center;
@@ -394,14 +398,7 @@ select {
   flex-wrap: nowrap;
   gap: 0.35rem 0.6rem;
   align-items: center;
-  /* flex-start, not center: when this overflows and scrolls (see
-     overflow-x below), `justify-content: center` centers the *overflowing*
-     content, so the bar can start scrolled to a mid-point with the first
-     button already hidden off the left edge. flex-start keeps the natural
-     reading order as the initial scroll position; it looks identical to
-     centered whenever everything actually fits (the common case), since
-     there's no extra space to distribute either way. */
-  justify-content: flex-start;
+  justify-content: center;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 999px;
@@ -410,11 +407,22 @@ select {
   align-self: center;
   margin-top: 0.75rem;
   max-width: 100%;
-  /* Always one line — content shrinks to fit (see button/span overrides
-     below) rather than wrapping; if it still doesn't fit on a very narrow
-     screen, scroll horizontally instead of breaking to a second line. */
-  overflow-x: auto;
   font-size: 0.82rem;
+}
+
+/* Always one line: the Go To button stays put (it must — its dropdown
+   floats above the bar via `position: absolute`, and an overflow:auto
+   ancestor would clip that popup, since setting overflow-x alone forces
+   overflow-y to `auto` too per the CSS spec), while everything after it
+   scrolls horizontally instead of wrapping to a second line if it doesn't
+   fit on a narrow screen. */
+.controls-scroll {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0.35rem 0.6rem;
+  overflow-x: auto;
+  min-width: 0;
 }
 
 .pdf-controls button,

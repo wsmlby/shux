@@ -17,7 +17,7 @@ export default function DeckCard({ book }: { book: ContinueReadingBook }) {
         </div>
       </div>
       <div className="book-title">{book.title}</div>
-      <div className="book-author">{book.progressPercent}% read</div>
+      <div className="book-author">{Math.round(book.progressPercent)}% read</div>
     </Link>
   );
 }

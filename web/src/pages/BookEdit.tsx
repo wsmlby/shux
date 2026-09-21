@@ -3,6 +3,7 @@ import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, ApiError, type Book } from "../api/client.js";
 import { useAuth } from "../auth/AuthContext.js";
+import { TXT_ENCODINGS } from "../textEncodings.js";
 
 interface FormState {
   title: string;
@@ -11,6 +12,7 @@ interface FormState {
   isbn: string;
   publishedAt: string;
   volumeLabel: string;
+  encoding: string;
 }
 
 function toForm(book: Book): FormState {
@@ -21,6 +23,7 @@ function toForm(book: Book): FormState {
     isbn: book.isbn ?? "",
     publishedAt: book.publishedAt ?? "",
     volumeLabel: book.volumeLabel ?? "",
+    encoding: book.encoding,
   };
 }
 
@@ -118,6 +121,7 @@ export default function BookEdit() {
         isbn: form.isbn || null,
         publishedAt: form.publishedAt || null,
         volumeLabel: book?.seriesId ? form.volumeLabel || null : undefined,
+        encoding: book?.format === "TXT" ? form.encoding : undefined,
         ...(pendingCoverUrl ? { coverUrl: pendingCoverUrl } : {}),
       });
       queryClient.invalidateQueries({ queryKey: ["book", id] });
@@ -208,6 +212,22 @@ export default function BookEdit() {
               <input value={form.publishedAt} onChange={(e) => set("publishedAt", e.target.value)} />
             </label>
           </div>
+          {book.format === "TXT" && (
+            <label>
+              Text encoding
+              <select value={form.encoding} onChange={(e) => set("encoding", e.target.value)}>
+                {TXT_ENCODINGS.map((enc) => (
+                  <option key={enc.value} value={enc.value}>
+                    {enc.label}
+                  </option>
+                ))}
+              </select>
+              <span className="muted field-hint">
+                If the text looks garbled when reading, the file probably isn't UTF-8 — try matching this to
+                whatever encoding the file was originally saved in.
+              </span>
+            </label>
+          )}
           {book.seriesId && (
             <label>
               Volume label

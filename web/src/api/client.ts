@@ -16,6 +16,8 @@ export interface Book {
   publishedAt: string | null;
   hasCover: boolean;
   fileSize: number;
+  // TXT only — see server/src/books/textEncodings.ts for the allowed values.
+  encoding: string;
   addedAt: string;
   updatedAt: string;
   seriesId: string | null;
@@ -43,6 +45,12 @@ export interface Progress {
   percent: number;
 }
 
+export interface TextChunk {
+  text: string;
+  chunkIndex: number;
+  totalChunks: number;
+}
+
 export interface ContinueReadingBook extends Book {
   progressPercent: number;
 }
@@ -55,6 +63,7 @@ export interface BookUpdate {
   publishedAt?: string | null;
   volumeLabel?: string | null;
   coverUrl?: string;
+  encoding?: string;
 }
 
 export interface MetadataLookupResult {
@@ -165,6 +174,8 @@ export const api = {
   coverUrl: (bookId: string, updatedAt?: string) =>
     `/api/books/${bookId}/cover${updatedAt ? `?v=${encodeURIComponent(updatedAt)}` : ""}`,
   fileUrl: (bookId: string) => `/api/books/${bookId}/file`,
+  textChunk: (bookId: string, index: number) =>
+    request<TextChunk>(`/books/${bookId}/text-chunk?index=${index}`),
 };
 
 export { ApiError };

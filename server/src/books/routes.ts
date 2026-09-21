@@ -8,11 +8,13 @@ import { scanLibrary, resetAllMetadata, saveCover } from "./scanner.js";
 import { fetchOpenLibraryMetadata } from "./metadata/openLibrary.js";
 import { extractPdfCover, PopplerNotInstalledError } from "./parsers/pdf.js";
 import { coversDir } from "../config.js";
+import { isValidTxtEncoding } from "./textEncodings.js";
+import { getTextChunk } from "./textChunks.js";
 
 const MIME: Record<string, string> = {
   PDF: "application/pdf",
   EPUB: "application/epub+zip",
-  TXT: "text/plain; charset=utf-8",
+  TXT: "text/plain",
 };
 
 export default async function bookRoutes(app: FastifyInstance) {
@@ -75,7 +77,10 @@ export default async function bookRoutes(app: FastifyInstance) {
       const stat = await fsp.stat(book.path).catch(() => null);
       if (!stat) return reply.code(404).send({ error: "File missing on disk" });
 
-      const mime = MIME[book.format];
+      // TxtReader reads via /text-chunk (below), not this endpoint — this
+      // charset is only relevant to other consumers of raw file bytes (e.g.
+      // opening the file URL directly in a browser tab, or downloading it).
+      const mime = book.format === "TXT" ? `${MIME.TXT}; charset=${book.encoding}` : MIME[book.format];
       const range = request.headers.range;
 
       if (range) {
@@ -98,6 +103,29 @@ export default async function bookRoutes(app: FastifyInstance) {
     }
   );
 
+  app.get<{ Params: { id: string }; Querystring: { index?: string } }>(
+    "/api/books/:id/text-chunk",
+    { preHandler: requireAuth },
+    async (request, reply) => {
+      const book = await prisma.book.findUnique({ where: { id: request.params.id } });
+      if (!book) return reply.code(404).send({ error: "Not found" });
+      if (book.format !== "TXT") return reply.code(400).send({ error: "Not a TXT book" });
+
+      const stat = await fsp.stat(book.path).catch(() => null);
+      if (!stat) return reply.code(404).send({ error: "File missing on disk" });
+
+      const requestedIndex = parseInt(request.query.index ?? "0", 10);
+      const chunkIndex = Number.isFinite(requestedIndex) && requestedIndex >= 0 ? requestedIndex : 0;
+
+      try {
+        return await getTextChunk(book.id, book.path, book.encoding, chunkIndex);
+      } catch (err) {
+        request.log.error({ err, bookId: book.id, encoding: book.encoding }, "failed to decode TXT chunk");
+        return reply.code(500).send({ error: "Failed to decode this file with its configured encoding" });
+      }
+    }
+  );
+
   app.delete<{ Params: { id: string } }>(
     "/api/books/:id",
     { preHandler: requireAdmin },
@@ -115,6 +143,7 @@ export default async function bookRoutes(app: FastifyInstance) {
     publishedAt?: string | null;
     volumeLabel?: string | null;
     coverUrl?: string;
+    encoding?: string;
   }
 
   const EDITABLE_STRING_FIELDS = ["author", "description", "isbn", "publishedAt", "volumeLabel"] as const;
@@ -143,6 +172,16 @@ export default async function bookRoutes(app: FastifyInstance) {
           return reply.code(400).send({ error: `${field} must be a string or null` });
         }
         data[field] = value === null ? null : value.trim() || null;
+      }
+
+      if (body.encoding !== undefined) {
+        if (book.format !== "TXT") {
+          return reply.code(400).send({ error: "encoding only applies to TXT books" });
+        }
+        if (typeof body.encoding !== "string" || !isValidTxtEncoding(body.encoding)) {
+          return reply.code(400).send({ error: "Unsupported text encoding" });
+        }
+        data.encoding = body.encoding;
       }
 
       if (body.coverUrl) {

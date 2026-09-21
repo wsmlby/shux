@@ -66,7 +66,11 @@ export default function PdfReader({ book, initialLocation, fullscreen }: Props) 
       api
         .saveProgress(book.id, {
           location: String(pageNumber),
-          percent: Math.round((pageNumber / numPages) * 100),
+          // Unrounded: a book with many pages can round to 0% for several
+          // pages in (page 3 of 2000 is 0.15%), which would make it vanish
+          // from the continue-reading deck (it only lists percent > 0)
+          // despite real progress. Display spots round this for the UI.
+          percent: (pageNumber / numPages) * 100,
         })
         .catch(() => {});
     }, 500);
@@ -225,47 +229,49 @@ export default function PdfReader({ book, initialLocation, fullscreen }: Props) 
               )}
             </GoToMenu>
           </div>
-          <div className="pdf-control-group">
-            <button className="icon-button" onClick={() => zoomBy(-1)} disabled={zoomIndex === 0} title="Zoom out">
-              −
-            </button>
-            <span className="pdf-zoom-label">{Math.round(zoom * 100)}%</span>
-            <button
-              className="icon-button"
-              onClick={() => zoomBy(1)}
-              disabled={zoomIndex === ZOOM_STEPS.length - 1}
-              title="Zoom in"
-            >
-              +
-            </button>
-          </div>
-          <div className="pdf-control-group">
-            <button
-              className={mode === "single" ? "" : "secondary"}
-              onClick={() => setMode("single")}
-              title="Single page"
-            >
-              1 page
-            </button>
-            <button
-              className={mode === "double" ? "" : "secondary"}
-              onClick={() => setMode("double")}
-              title="Two-page spread"
-            >
-              2 pages
-            </button>
-          </div>
-          <div className="pdf-control-group">
-            <button onClick={() => goTo(-step)} disabled={pageNumber <= 1}>
-              ← Prev
-            </button>
-            <span>
-              Page {pageNumber}
-              {showRightPage ? `–${rightPageNumber}` : ""} of {numPages}
-            </span>
-            <button onClick={() => goTo(step)} disabled={(showRightPage ? rightPageNumber : pageNumber) >= numPages}>
-              Next →
-            </button>
+          <div className="controls-scroll">
+            <div className="pdf-control-group">
+              <button className="icon-button" onClick={() => zoomBy(-1)} disabled={zoomIndex === 0} title="Zoom out">
+                −
+              </button>
+              <span className="pdf-zoom-label">{Math.round(zoom * 100)}%</span>
+              <button
+                className="icon-button"
+                onClick={() => zoomBy(1)}
+                disabled={zoomIndex === ZOOM_STEPS.length - 1}
+                title="Zoom in"
+              >
+                +
+              </button>
+            </div>
+            <div className="pdf-control-group">
+              <button
+                className={mode === "single" ? "" : "secondary"}
+                onClick={() => setMode("single")}
+                title="Single page"
+              >
+                1 page
+              </button>
+              <button
+                className={mode === "double" ? "" : "secondary"}
+                onClick={() => setMode("double")}
+                title="Two-page spread"
+              >
+                2 pages
+              </button>
+            </div>
+            <div className="pdf-control-group">
+              <button onClick={() => goTo(-step)} disabled={pageNumber <= 1}>
+                ← Prev
+              </button>
+              <span>
+                Page {pageNumber}
+                {showRightPage ? `–${rightPageNumber}` : ""} of {numPages}
+              </span>
+              <button onClick={() => goTo(step)} disabled={(showRightPage ? rightPageNumber : pageNumber) >= numPages}>
+                Next →
+              </button>
+            </div>
           </div>
         </div>
       )}

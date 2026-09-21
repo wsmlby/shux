@@ -61,7 +61,7 @@ export default function BookDetail() {
           {book.isbn && <span>ISBN {book.isbn}</span>}
         </div>
         {book.description && <p className="book-description">{book.description}</p>}
-        {!!progress?.percent && <p className="muted">{progress.percent}% read</p>}
+        {!!progress?.percent && <p className="muted">{Math.round(progress.percent)}% read</p>}
         <div className="book-actions">
           <button onClick={() => navigate(`/reader/${book.id}`)}>Read</button>
           {!!progress?.percent && (

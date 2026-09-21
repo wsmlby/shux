@@ -50,6 +50,10 @@ model Book {
   publishedAt  String?
   hasCover     Boolean           @default(false)
   fileSize     Int
+  // TXT only: the text encoding to decode the file with when serving it for
+  // reading (see server/src/books/textEncodings.ts for the allowed values).
+  // Other formats ignore this — EPUB/PDF carry their own encoding info.
+  encoding     String            @default("utf-8")
   addedAt      DateTime          @default(now())
   updatedAt    DateTime          @updatedAt
   progress     ReadingProgress[]

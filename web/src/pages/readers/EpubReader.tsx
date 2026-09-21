@@ -124,11 +124,18 @@ export default function EpubReader({ book, initialLocation, fullscreen }: Props)
     rendition.on("relocated", (location: EpubLocation) => {
       currentIndex = location.start.index;
       currentCfi = location.start.cfi;
-      let percent: number;
+      // Unrounded: this is what gets saved to the server, and "continue
+      // reading" only lists books with percent > 0. A large book can have
+      // hundreds of locations/spine sections, so a rounded integer percent
+      // is genuinely 0 for the first several pages (e.g. page 2 of 600 is
+      // 0.33%, which rounds to 0) — that would make a book the user is
+      // actively partway into silently vanish from (or never appear in) the
+      // continue-reading deck. Round only for on-screen display, below.
+      let rawPercent: number;
       let page: number | undefined;
       let total: number | undefined;
       if (locationsReady.current) {
-        percent = Math.round(epub.locations.percentageFromCfi(location.start.cfi) * 100);
+        rawPercent = epub.locations.percentageFromCfi(location.start.cfi) * 100;
         page = epub.locations.locationFromCfi(location.start.cfi) + 1;
         total = epub.locations.length();
       } else {
@@ -136,9 +143,9 @@ export default function EpubReader({ book, initialLocation, fullscreen }: Props)
         // — rough, but never wrong in a way that looks like a bug the way a
         // stale/partial locations count does.
         const spineTotal = epub.spine?.length || 1;
-        percent = Math.round(((location.start.index ?? 0) / spineTotal) * 100);
+        rawPercent = ((location.start.index ?? 0) / spineTotal) * 100;
       }
-      setProgress({ percent, page, total });
+      setProgress({ percent: Math.round(rawPercent), page, total });
       // epub.js only ever sets atStart/atEnd to `true` (never explicitly
       // `false`), and only from the spine position + in-chapter pagination —
       // never from the locations table — so this is reliable even before
@@ -148,7 +155,7 @@ export default function EpubReader({ book, initialLocation, fullscreen }: Props)
 
       clearTimeout(saveTimer);
       saveTimer = setTimeout(() => {
-        api.saveProgress(book.id, { location: location.start.cfi, percent }).catch(() => {});
+        api.saveProgress(book.id, { location: location.start.cfi, percent: rawPercent }).catch(() => {});
       }, 800);
     });
 
@@ -285,13 +292,15 @@ export default function EpubReader({ book, initialLocation, fullscreen }: Props)
               </>
             )}
           </GoToMenu>
-          <button onClick={() => navRef.current.prev()} disabled={atStart}>
-            ← Prev
-          </button>
-          <span>{progress.page ? `Page ${progress.page} of ${progress.total} · ` : ""}{progress.percent}%</span>
-          <button onClick={() => navRef.current.next()} disabled={atEnd}>
-            Next →
-          </button>
+          <div className="controls-scroll">
+            <button onClick={() => navRef.current.prev()} disabled={atStart}>
+              ← Prev
+            </button>
+            <span>{progress.page ? `Page ${progress.page} of ${progress.total} · ` : ""}{progress.percent}%</span>
+            <button onClick={() => navRef.current.next()} disabled={atEnd}>
+              Next →
+            </button>
+          </div>
         </div>
       )}
       {atEnd && book.seriesId && <NextInSeriesCard book={book} />}
