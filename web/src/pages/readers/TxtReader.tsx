@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { api, type Book } from "../../api/client.js";
 import NextInSeriesCard from "../../components/NextInSeriesCard.js";
+import GoToMenu from "../../components/GoToMenu.js";
 
 interface Props {
   book: Book;
   initialLocation: string | null;
+  fullscreen: boolean;
 }
 
 // Plain text has no natural page breaks, so we treat fixed-size byte ranges
@@ -12,7 +14,7 @@ interface Props {
 // large TXT files never get loaded into the browser all at once.
 const CHUNK_SIZE = 4000;
 
-export default function TxtReader({ book, initialLocation }: Props) {
+export default function TxtReader({ book, initialLocation, fullscreen }: Props) {
   const totalChunks = Math.max(1, Math.ceil(book.fileSize / CHUNK_SIZE));
   const [chunkIndex, setChunkIndex] = useState(() => {
     const parsed = initialLocation ? parseInt(initialLocation, 10) : 0;
@@ -20,6 +22,7 @@ export default function TxtReader({ book, initialLocation }: Props) {
   });
   const [text, setText] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [goToInput, setGoToInput] = useState("");
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -70,6 +73,19 @@ export default function TxtReader({ book, initialLocation }: Props) {
     setChunkIndex((i) => Math.min(Math.max(0, i + delta), totalChunks - 1));
   }
 
+  function goToPage(target: number) {
+    setChunkIndex(Math.min(Math.max(0, target - 1), totalChunks - 1));
+  }
+
+  function handleTapZone(e: React.MouseEvent<HTMLDivElement>) {
+    if (!fullscreen) return;
+    const target = e.target as HTMLElement | null;
+    if (target?.closest?.("a")) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    if (e.clientX - rect.left < rect.width / 2) goTo(-1);
+    else goTo(1);
+  }
+
   useEffect(() => {
     function onKeyUp(e: KeyboardEvent) {
       if (e.key === "ArrowLeft") goTo(-1);
@@ -82,7 +98,7 @@ export default function TxtReader({ book, initialLocation }: Props) {
 
   return (
     <div className="txt-reader-shell">
-      <div ref={containerRef} className="txt-reader">
+      <div ref={containerRef} className="txt-reader" onClick={handleTapZone}>
         {error ? (
           <p className="error">{error}</p>
         ) : text === null ? (
@@ -92,6 +108,50 @@ export default function TxtReader({ book, initialLocation }: Props) {
         )}
       </div>
       <div className="pdf-controls">
+        <GoToMenu>
+          {(close) => (
+            <>
+              <button
+                onClick={() => {
+                  goToPage(1);
+                  close();
+                }}
+              >
+                First page
+              </button>
+              <button
+                onClick={() => {
+                  goToPage(totalChunks);
+                  close();
+                }}
+              >
+                Last page
+              </button>
+              <div className="goto-divider" />
+              <form
+                className="goto-panel-form"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const target = parseInt(goToInput, 10);
+                  if (Number.isFinite(target)) goToPage(target);
+                  setGoToInput("");
+                  close();
+                }}
+              >
+                <input
+                  type="number"
+                  min={1}
+                  max={totalChunks}
+                  placeholder={`1–${totalChunks}`}
+                  value={goToInput}
+                  onChange={(e) => setGoToInput(e.target.value)}
+                  autoFocus
+                />
+                <button type="submit">Go</button>
+              </form>
+            </>
+          )}
+        </GoToMenu>
         <button onClick={() => goTo(-1)} disabled={chunkIndex <= 0}>
           ← Prev
         </button>

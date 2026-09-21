@@ -5,6 +5,7 @@ import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
 import { api, type Book } from "../../api/client.js";
 import NextInSeriesCard from "../../components/NextInSeriesCard.js";
+import GoToMenu from "../../components/GoToMenu.js";
 
 // The `pdfjs-dist` version here (see package.json) must match the version
 // react-pdf bundles internally — a mismatched worker/API version makes
@@ -14,6 +15,7 @@ pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
 interface Props {
   book: Book;
   initialLocation: string | null;
+  fullscreen: boolean;
 }
 
 type SpreadMode = "single" | "double";
@@ -30,7 +32,7 @@ function loadViewPrefs(): { zoomIndex: number; mode: SpreadMode } {
   return { zoomIndex: ZOOM_STEPS.indexOf(1), mode: "single" };
 }
 
-export default function PdfReader({ book, initialLocation }: Props) {
+export default function PdfReader({ book, initialLocation, fullscreen }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [numPages, setNumPages] = useState(0);
   const [pageNumber, setPageNumber] = useState(() => {
@@ -41,6 +43,7 @@ export default function PdfReader({ book, initialLocation }: Props) {
   const [pageAspectRatio, setPageAspectRatio] = useState<number | null>(null); // height / width
   const [error, setError] = useState<string | null>(null);
   const [{ zoomIndex, mode }, setViewPrefs] = useState(loadViewPrefs);
+  const [goToInput, setGoToInput] = useState("");
 
   useEffect(() => {
     localStorage.setItem(ZOOM_STORAGE_KEY, JSON.stringify({ zoomIndex, mode }));
@@ -74,6 +77,10 @@ export default function PdfReader({ book, initialLocation }: Props) {
 
   function goTo(delta: number) {
     setPageNumber((p) => Math.min(Math.max(1, p + delta), numPages || p + delta));
+  }
+
+  function goToPage(target: number) {
+    setPageNumber(Math.min(Math.max(1, target), numPages || target));
   }
 
   useEffect(() => {
@@ -119,48 +126,105 @@ export default function PdfReader({ book, initialLocation }: Props) {
   const rightPageNumber = pageNumber + 1;
   const showRightPage = mode === "double" && rightPageNumber <= numPages;
 
+  function handleTapZone(e: React.MouseEvent<HTMLDivElement>) {
+    if (!fullscreen) return;
+    const target = e.target as HTMLElement | null;
+    if (target?.closest?.("a")) return; // let PDF annotation links behave normally
+    const rect = e.currentTarget.getBoundingClientRect();
+    if (e.clientX - rect.left < rect.width / 2) goTo(-step);
+    else goTo(step);
+  }
+
   return (
     <div className="pdf-reader" ref={containerRef}>
       {error && <p className="error">{error}</p>}
-      <Document
-        file={api.fileUrl(book.id)}
-        onLoadSuccess={({ numPages: n }) => {
-          setError(null);
-          setNumPages(n);
-        }}
-        onLoadError={(err) => {
-          console.error("Failed to load PDF:", err);
-          setError(`Failed to load PDF: ${err.message}`);
-        }}
-        loading={<p>Loading PDF…</p>}
-      >
-        <div className="pdf-pages" style={{ gap }}>
-          {/* Keying by page+width+mode forces a clean remount instead of
-              react-pdf reusing the previous canvas, which otherwise can be
-              left blank after a page-turn's render task gets superseded. */}
-          <Page
-            key={`${pageNumber}-${pageWidth}-${mode}`}
-            pageNumber={pageNumber}
-            width={pageWidth}
-            renderAnnotationLayer
-            renderTextLayer
-            onLoadSuccess={handlePageLoad}
-            onRenderError={(err) => console.error("Failed to render PDF page:", err)}
-          />
-          {showRightPage && (
+      <div className="pdf-tap-zone" onClick={handleTapZone}>
+        <Document
+          file={api.fileUrl(book.id)}
+          onLoadSuccess={({ numPages: n }) => {
+            setError(null);
+            setNumPages(n);
+          }}
+          onLoadError={(err) => {
+            console.error("Failed to load PDF:", err);
+            setError(`Failed to load PDF: ${err.message}`);
+          }}
+          loading={<p>Loading PDF…</p>}
+        >
+          <div className="pdf-pages" style={{ gap }}>
+            {/* Keying by page+width+mode forces a clean remount instead of
+                react-pdf reusing the previous canvas, which otherwise can be
+                left blank after a page-turn's render task gets superseded. */}
             <Page
-              key={`${rightPageNumber}-${pageWidth}-${mode}`}
-              pageNumber={rightPageNumber}
+              key={`${pageNumber}-${pageWidth}-${mode}`}
+              pageNumber={pageNumber}
               width={pageWidth}
               renderAnnotationLayer
               renderTextLayer
+              onLoadSuccess={handlePageLoad}
               onRenderError={(err) => console.error("Failed to render PDF page:", err)}
             />
-          )}
-        </div>
-      </Document>
+            {showRightPage && (
+              <Page
+                key={`${rightPageNumber}-${pageWidth}-${mode}`}
+                pageNumber={rightPageNumber}
+                width={pageWidth}
+                renderAnnotationLayer
+                renderTextLayer
+                onRenderError={(err) => console.error("Failed to render PDF page:", err)}
+              />
+            )}
+          </div>
+        </Document>
+      </div>
       {numPages > 0 && (
         <div className="pdf-controls">
+          <div className="pdf-control-group">
+            <GoToMenu>
+              {(close) => (
+                <>
+                  <button
+                    onClick={() => {
+                      goToPage(1);
+                      close();
+                    }}
+                  >
+                    First page
+                  </button>
+                  <button
+                    onClick={() => {
+                      goToPage(numPages);
+                      close();
+                    }}
+                  >
+                    Last page
+                  </button>
+                  <div className="goto-divider" />
+                  <form
+                    className="goto-panel-form"
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      const target = parseInt(goToInput, 10);
+                      if (Number.isFinite(target)) goToPage(target);
+                      setGoToInput("");
+                      close();
+                    }}
+                  >
+                    <input
+                      type="number"
+                      min={1}
+                      max={numPages}
+                      placeholder={`1–${numPages}`}
+                      value={goToInput}
+                      onChange={(e) => setGoToInput(e.target.value)}
+                      autoFocus
+                    />
+                    <button type="submit">Go</button>
+                  </form>
+                </>
+              )}
+            </GoToMenu>
+          </div>
           <div className="pdf-control-group">
             <button className="icon-button" onClick={() => zoomBy(-1)} disabled={zoomIndex === 0} title="Zoom out">
               −
